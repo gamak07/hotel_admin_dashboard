@@ -1,4 +1,4 @@
-import React, { useReducer, useContext, createContext, useEffect } from 'react';
+import React, { useReducer, useContext, createContext, useEffect } from "react";
 
 const AdminContext = createContext();
 
@@ -8,17 +8,17 @@ const initialState = {
 
 const reducer = (state, action) => {
   switch (action.type) {
-    case 'fetchRooms':
+    case "fetchRooms":
       return {
         ...state,
         rooms: action.payload,
       };
-    case 'addRoom':
+    case "addRoom":
       return {
         ...state,
         rooms: [...state.rooms, action.payload],
       };
-    case 'deleteRoom':
+    case "deleteRoom":
       return {
         ...state,
         rooms: state.rooms.filter((room) => room.id !== action.payload),
@@ -34,11 +34,11 @@ const AdminProvider = ({ children }) => {
   useEffect(() => {
     const fetchRooms = async () => {
       try {
-        const response = await fetch('http://localhost:5000/rooms');
+        const response = await fetch("http://localhost:5000/rooms");
         const data = await response.json();
-        dispatch({ type: 'fetchRooms', payload: data });
+        dispatch({ type: "fetchRooms", payload: data });
       } catch (error) {
-        console.error('Failed to fetch rooms', error);
+        console.error("Failed to fetch rooms", error);
       }
     };
 
@@ -48,18 +48,18 @@ const AdminProvider = ({ children }) => {
   // Add a new room using fetch
   const addRoom = async (newRoom) => {
     try {
-      const response = await fetch('http://localhost:5000/rooms', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/rooms", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(newRoom),
       });
       const data = await response.json();
-      dispatch({ type: 'addRoom', payload: data }); // Use the added room data
-      alert('Room added successfully!');
+      dispatch({ type: "addRoom", payload: data }); // Use the added room data
+      alert("Room added successfully!");
     } catch (error) {
-      alert('Failed to add room: ' + error.message); // Error handling
+      alert("Failed to add room: " + error.message); // Error handling
       console.error(error);
     }
   };
@@ -68,12 +68,12 @@ const AdminProvider = ({ children }) => {
   const deleteRoom = async (id) => {
     try {
       await fetch(`http://localhost:5000/rooms/${id}`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
-      dispatch({ type: 'deleteRoom', payload: id }); // Update state after deletion
-      alert('Room deleted successfully!');
+      dispatch({ type: "deleteRoom", payload: id }); // Update state after deletion
+      alert("Room deleted successfully!");
     } catch (error) {
-      alert('Failed to delete room: ' + error.message); // Error handling
+      alert("Failed to delete room: " + error.message); // Error handling
       console.error(error);
     }
   };
@@ -94,7 +94,7 @@ const AdminProvider = ({ children }) => {
 const useAdmin = () => {
   const context = useContext(AdminContext);
   if (!context) {
-    console.error('You can\'t use useAdmin out of context provider');
+    console.error("You can't use useAdmin out of context provider");
     return null; // Return null if context is not available
   }
   return context;

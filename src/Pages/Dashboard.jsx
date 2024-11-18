@@ -1,52 +1,99 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Sidebar from '../Components/Sidebar';
+import ReservationHistory from '../Components/ReservationHistory';
 
 const Dashboard = () => {
   const [totalRooms, setTotalRooms] = useState(0);
-  const [dailyCheckoutCount, setDailyCheckoutCount] = useState(''); // Static value, you might want to calculate this dynamically.
+  const [dailyCheckoutCount, setDailyCheckoutCount] = useState(0);
   const [totalBookings, setTotalBookings] = useState(0);
+  const [isLoading, setIsLoading] = useState(true); // Track loading state
+  const [error, setError] = useState(null); // Track error state
+
+  const getTodayDate = () => new Date().toISOString().split('T')[0]; // Helper to get today's date
+
+  // Fetch data concurrently
+  const fetchData = async () => {
+    try {
+      const [roomsRes, bookingsRes, checkInRes] = await Promise.all([
+        fetch('http://localhost:5000/rooms'),
+        fetch('http://localhost:5000/bookings'),
+        fetch('http://localhost:5000/checkIn')
+      ]);
+
+      if (!roomsRes.ok || !bookingsRes.ok || !checkInRes.ok) {
+        throw new Error('Failed to fetch data');
+      }
+
+      const rooms = await roomsRes.json();
+      const bookings = await bookingsRes.json();
+      const checkIns = await checkInRes.json();
+
+      setTotalRooms(rooms.length);
+      setTotalBookings(bookings.length);
+      setDailyCheckoutCount(checkIns.length);
+    } catch (error) {
+      console.error('Failed to fetch data:', error);
+      setError(error.message); // Set error message
+    } finally {
+      setIsLoading(false); // Set loading to false after fetching
+    }
+  };
+
+  const saveAndResetDailyCount = useCallback(() => {
+    const today = getTodayDate();
+    const newEntry = { date: today, count: dailyCheckoutCount };
+    
+    const storedHistory = JSON.parse(localStorage.getItem('reservationHistory')) || [];
+    const updatedHistory = [...storedHistory, newEntry];
+
+    localStorage.setItem('reservationHistory', JSON.stringify(updatedHistory));
+    setDailyCheckoutCount(0); // Reset count after saving
+  }, [dailyCheckoutCount]);
+
+  const scheduleDailyReset = useCallback(() => {
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0); // Set to midnight
+
+    const timeUntilMidnight = midnight - now;
+
+    // Schedule reset at midnight
+    setTimeout(() => {
+      saveAndResetDailyCount();
+      localStorage.setItem('lastCheckedDate', getTodayDate()); 
+      scheduleDailyReset(); // Schedule next reset
+    }, timeUntilMidnight);
+  }, [saveAndResetDailyCount]);
 
   useEffect(() => {
-    const getRoomNumber = async () => {
-      const res = await fetch('http://localhost:5000/rooms');
-      const data = await res.json();
-      setTotalRooms(data.length);
-    };
-    getRoomNumber();
-  }, []);
+    const lastCheckedDate = localStorage.getItem('lastCheckedDate');
+    const today = getTodayDate();
 
-  useEffect(() => {
-    const getTotalBooking = async () => {
-      const res = await fetch('http://localhost:5000/bookings');
-      const data = await res.json();
-      setTotalBookings(data.length);
+    if (lastCheckedDate !== today) {
+      saveAndResetDailyCount();
+      localStorage.setItem('lastCheckedDate', today);
+    }
 
-     
-    };
-    getTotalBooking();
-  }, []); // Add today as a dependency to recalculate when it changes
+    fetchData(); // Fetch initial data
+    scheduleDailyReset(); // Schedule daily resets
+  }, [saveAndResetDailyCount, scheduleDailyReset]); // Run only once on mount
 
-  const fetchDailyCheckoutCount = async () => {
-    const res = await fetch('http://localhost:5000/checkIn');
-    const data = await res.json();
-    setDailyCheckoutCount(data.length);
-};
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-lg font-semibold">Loading...</p>
+      </div>
+    );
+  }
 
-useEffect(() => {
-    fetchDailyCheckoutCount();
+  if (error) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p className="text-lg font-semibold text-red-500">{error}</p>
+      </div>
+    );
+  }
 
-    const interval = setInterval(() => {
-        const now = new Date();
-        const lastCheckedDate = localStorage.getItem('lastCheckedDate');
-        if (lastCheckedDate !== now.toISOString().split('T')[0]) {
-            // If the date has changed, reset the count
-            setDailyCheckoutCount(0);
-            localStorage.setItem('lastCheckedDate', now.toISOString().split('T')[0]);
-        }
-    }, 1000 * 60 * 60); // Check every hour
-
-    return () => clearInterval(interval); // Clean up on unmount
-}, []);
   return (
     <div className="flex h-screen overflow-hidden bg-gray-200">
       <Sidebar />
@@ -59,7 +106,7 @@ useEffect(() => {
             <p className="text-2xl font-bold">{totalRooms}</p>
           </div>
 
-          {/* Card for Available Rooms */}
+          {/* Card for Daily Reservation */}
           <div className="bg-white p-4 rounded-lg shadow-md">
             <h2 className="text-lg font-semibold">Daily Reservation</h2>
             <p className="text-2xl font-bold">{dailyCheckoutCount}</p>
@@ -71,6 +118,8 @@ useEffect(() => {
             <p className="text-2xl font-bold">{totalBookings}</p>
           </div>
         </div>
+
+        <ReservationHistory />
       </div>
     </div>
   );
